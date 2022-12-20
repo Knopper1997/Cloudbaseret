@@ -88,7 +88,7 @@ class Daily(toga.App):
             self.sims[s.attrib['id']] = "Instance:"+s.attrib['id']
         self.second_window.close()
         self.show_sim_list()
-##
+
     def show_sim_list(self):
         container = toga.ScrollContainer(horizontal=False,)
         sims_box = toga.Box(style=Pack(direction=COLUMN))
@@ -116,8 +116,7 @@ class Daily(toga.App):
         sims_box.add(button2)
         sims_box.add(g_button)
         self.main_window.content = container
-##
-###
+
     async def show_enabledactivities(self, widget):
         async with httpx.AsyncClient() as client:
             enabledevents = await client.get(
@@ -131,7 +130,7 @@ class Daily(toga.App):
         print("Enabled events")
         for e in events['event']:
             print(e['@label'])
-##
+
     async def create_show_enabled_activities(self, widget):
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -154,7 +153,7 @@ class Daily(toga.App):
 
         self.update_activities_box(events)
         self.activities_window.show()
-##
+
     async def execute_activity(self, widget):
         enabled_events = None
         event_id = widget.id
@@ -172,7 +171,7 @@ class Daily(toga.App):
             self.update_activities_box(events)
         else:
             print("[!] No enabled events!")
-##
+
     async def get_enabled_events(self):
         url = f"https://repository.dcrgraphs.net/api/graphs/{self.graph_id}/sims/{self.sim_id}/events?filter=only-enabled"
         async with httpx.AsyncClient() as client:
