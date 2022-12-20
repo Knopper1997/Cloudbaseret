@@ -1,13 +1,7 @@
 
 """
-A Workflow App using the DCR Active Repository
-
-TODO:
-    0) Fill in the template and make sure you understand how it works
-    1) Make the app show only enabled-or-pending activities - and it shows an exclamation mark (!) After a pending activity
-    2) When there are no more enabled-or-pending activities it deletes the simulation id.
-    3) Extra: Add a button to delete the simulation in the "Instance window".
-
+App'en er skabt i formålet om at hjælpe patienter med deres morgenrutine
+efter en knæoperation
 """
 import toga
 from toga.style import Pack
@@ -20,8 +14,8 @@ import xml.etree.ElementTree as ET
 class Daily(toga.App):
 
     def startup(self):
-        self.graph_id=1329742
-        self.simulationwindow=0
+        self.graph_id = 1329742
+        self.simulationwindow = 0
 
         login_box = toga.Box(style=Pack(direction=COLUMN))
         login = toga.Button(
@@ -71,6 +65,15 @@ class Daily(toga.App):
         self.second_window.content = login_box
         self.second_window.show()
 
+    async def create_instance(self, widget):
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post("https://repository.dcrgraphs.net/api/graphs/" + self.graph_id + "/sims",
+                                         auth=(self.user_input, self.password_input.value))
+
+        self.simulationid = response.headers['simulationid']
+        print("New simulation created with id:", self.simulationid)
+
     async def login(self, widget):
         async with httpx.AsyncClient() as client:
             response = await client.get(f"https://repository.dcrgraphs.net/api/graphs/{self.graph_id}/sims",
@@ -85,7 +88,7 @@ class Daily(toga.App):
             self.sims[s.attrib['id']] = "Instance:"+s.attrib['id']
         self.second_window.close()
         self.show_sim_list()
-
+##
     def show_sim_list(self):
         container = toga.ScrollContainer(horizontal=False,)
         sims_box = toga.Box(style=Pack(direction=COLUMN))
@@ -93,7 +96,7 @@ class Daily(toga.App):
         for id, name in self.sims.items():
             g_button = toga.Button(
                 name,
-                on_press=self.show_enabled_activities,
+                on_press=self.show_enabledactivities,
                 style=Pack(padding=5),
                 id = id
             )
@@ -103,21 +106,37 @@ class Daily(toga.App):
                 on_press=self.create_show_enabled_activities,
                 style=Pack(padding=5)
         )
+
+        button2 = toga.Button(
+            'Vis mulige aktiviteter',
+            on_press=self.show_enabledactivities,
+            style=Pack(padding=5)
+        )
+
+        sims_box.add(button2)
         sims_box.add(g_button)
         self.main_window.content = container
-
-    async def show_enabled_activities(self, widget):
-        self.sim_id = widget.id
-        enabled_events = await self.get_enabled_events()
-        print(enabled_events.json())
-        root = ET.fromstring(enabled_events.json())
-        events = root.findall('event')
-        self.show_activities_window(events)
-
+##
+###
+    async def show_enabledactivities(self, widget):
+        async with httpx.AsyncClient() as client:
+            enabledevents = await client.get(
+                "https://repository.dcrgraphs.net/api/graphs/" + self.graph_id + "/sims/" + self.simulationid + "/events?filter=only-enabled",
+                auth=(self.user_input.value, self.password_input.value))
+        eventsxml = enabledevents.text
+        eventsxmlnoquote = eventsxml[1:len(eventsxml) - 1]
+        eventsxmlclean = eventsxmlnoquote.replace('\\\"', '\"')
+        eventsjson = xmltodict.parse(eventsxmlclean)
+        events = eventsjson['events']
+        print("Enabled events")
+        for e in events['event']:
+            print(e['@label'])
+##
     async def create_show_enabled_activities(self, widget):
         async with httpx.AsyncClient() as client:
-            response = await client.post(f"https://repository.dcrgraphs.net/api/graphs/{self.graph_id}/sims",
-                                         auth=(self.username, self.password))
+            response = await client.post(
+                f"https://repository.dcrgraphs.net/api/graphs/{self.graph_id}/sims",
+                auth=(self.username, self.password))
             self.sim_id = response.headers['simulationid']
 
             enabled_events = await self.get_enabled_events()
@@ -135,13 +154,14 @@ class Daily(toga.App):
 
         self.update_activities_box(events)
         self.activities_window.show()
-
+##
     async def execute_activity(self, widget):
         enabled_events = None
         event_id = widget.id
         async with httpx.AsyncClient() as client:
-            response = await client.post(f"https://repository.dcrgraphs.net/api/graphs/{self.graph_id}/sims/{self.sim_id}/events/{event_id}",
-                                         auth=(self.username, self.password))
+            response = await client.post(
+                f"https://repository.dcrgraphs.net/api/graphs/{self.graph_id}/sims/{self.sim_id}/events/{event_id}",
+                auth=(self.username, self.password))
         if len(response.text) == 0:
             enabled_events = await self.get_enabled_events()
         else:
@@ -152,9 +172,14 @@ class Daily(toga.App):
             self.update_activities_box(events)
         else:
             print("[!] No enabled events!")
-
+##
     async def get_enabled_events(self):
         url = f"https://repository.dcrgraphs.net/api/graphs/{self.graph_id}/sims/{self.sim_id}/events?filter=only-enabled"
+        async with httpx.AsyncClient() as client:
+            return await client.get(url,  auth=(self.username, self.password))
+
+    async def get_pending_events(self):
+        url = f"https://repository.dcrgraphs.net/api/graphs/{self.graph_id}/sims/{self.sim_id}/events?filter=only-pending"
         async with httpx.AsyncClient() as client:
             return await client.get(url,  auth=(self.username, self.password))
 
